@@ -1,20 +1,47 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 
-// Use /app/data in production (Docker volume), fallback to project root in dev
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..');
 const DB_PATH = path.join(DATA_DIR, 'tasks.db');
 const db = new Database(DB_PATH);
 
-// Enable WAL for better concurrent performance
 db.pragma('journal_mode = WAL');
+db.pragma('foreign_keys = ON');
 
-// Schema
+// ── Core schema ───────────────────────────────────────────────────────────────
 db.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    google_id TEXT UNIQUE,
+    email TEXT NOT NULL,
+    name TEXT NOT NULL DEFAULT 'User',
+    avatar TEXT,
+    role TEXT NOT NULL DEFAULT 'user' CHECK(role IN ('user','admin')),
+    whatsapp_to TEXT,
+    reminder_time TEXT NOT NULL DEFAULT '08:00',
+    reminder_enabled INTEGER NOT NULL DEFAULT 1,
+    email_reminders INTEGER NOT NULL DEFAULT 0,
+    google_access_token TEXT,
+    google_refresh_token TEXT,
+    calendar_connected INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS otps (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    phone TEXT NOT NULL,
+    code TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    used INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
   CREATE TABLE IF NOT EXISTS categories (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
     color TEXT NOT NULL DEFAULT '#6366f1',
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -27,6 +54,7 @@ db.exec(`
     status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','in_progress','done')),
     due_date TEXT,
     completed_at TEXT,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
@@ -37,20 +65,13 @@ db.exec(`
   );
 `);
 
-// Seed default categories if empty
-const catCount = db.prepare('SELECT COUNT(*) as n FROM categories').get();
-if (catCount.n === 0) {
-  const insert = db.prepare('INSERT INTO categories (name, color) VALUES (?, ?)');
-  insert.run('Personal', '#6366f1');
-  insert.run('Work', '#f59e0b');
-  insert.run('Health', '#10b981');
-  insert.run('Learning', '#3b82f6');
-}
-
-// Seed default settings
-const settingsInsert = db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)');
-settingsInsert.run('whatsapp_to', process.env.WHATSAPP_TO || '');
-settingsInsert.run('reminder_time', process.env.REMINDER_TIME || '08:00');
-settingsInsert.run('reminder_enabled', 'true');
+// ── Safe migrations for existing installs ─────────────────────────────────────
+const migrate = (sql) => { try { db.exec(sql); } catch(e) { /* column already exists */ } };
+migrate('ALTER TABLE tasks ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE CASCADE');
+migrate('ALTER TABLE categories ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE CASCADE');
+migrate('ALTER TABLE users ADD COLUMN calendar_connected INTEGER NOT NULL DEFAULT 0');
+migrate('ALTER TABLE users ADD COLUMN email_reminders INTEGER NOT NULL DEFAULT 0');
+migrate('ALTER TABLE users ADD COLUMN reminder_time TEXT NOT NULL DEFAULT \'08:00\'');
+migrate('ALTER TABLE users ADD COLUMN reminder_enabled INTEGER NOT NULL DEFAULT 1');
 
 module.exports = db;
