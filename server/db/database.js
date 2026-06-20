@@ -1,7 +1,9 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 
-const DB_PATH = path.join(__dirname, '..', 'tasks.db');
+// Use /app/data in production (Docker volume), fallback to project root in dev
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..');
+const DB_PATH = path.join(DATA_DIR, 'tasks.db');
 const db = new Database(DB_PATH);
 
 // Enable WAL for better concurrent performance
