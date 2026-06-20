@@ -18,10 +18,16 @@ router.get('/', (req, res) => {
   if (priority) { sql += ' AND t.priority = ?'; params.push(priority); }
   if (date) { sql += ' AND date(t.due_date) = date(?)'; params.push(date); }
 
-  sql += ' ORDER BY CASE t.priority WHEN "high" THEN 1 WHEN "medium" THEN 2 ELSE 3 END, t.due_date ASC, t.created_at DESC';
+  // Fix: use single quotes for SQL string literals — double quotes are identifiers in SQLite
+  sql += " ORDER BY CASE t.priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END, t.due_date ASC, t.created_at DESC";
 
-  const tasks = db.prepare(sql).all(...params);
-  res.json(tasks);
+  try {
+    const tasks = db.prepare(sql).all(...params);
+    res.json(tasks);
+  } catch (err) {
+    console.error('[tasks] GET / error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // GET /api/tasks/stats
