@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db/database');
 const { sendDailyDigest } = require('../services/whatsapp');
+const { startScheduler } = require('../services/scheduler');
 
 // GET /api/settings
 router.get('/', (req, res) => {
@@ -20,6 +21,10 @@ router.put('/', (req, res) => {
     }
   });
   update(req.body);
+
+  // Restart scheduler so new reminder_time / reminder_enabled takes effect immediately
+  startScheduler();
+
   const rows = db.prepare('SELECT key, value FROM settings').all();
   res.json(Object.fromEntries(rows.map(r => [r.key, r.value])));
 });
