@@ -1,5 +1,3 @@
-import { useState } from 'react'
-
 export default function Header({ onNewTask, activeView, setActiveView }) {
   const views = [
     { id: 'tasks', label: 'Tasks' },
