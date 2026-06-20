@@ -1,111 +1,133 @@
-import { useEffect, useState } from 'react'
-import { getSettings, updateSettings, testWhatsApp } from '../api'
+import { useState, useEffect } from 'react';
+import { api } from '../api';
+import { useAuth } from '../context/AuthContext';
+import CalendarSync from './CalendarSync';
 
-export default function Settings() {
-  const [form, setForm] = useState({ whatsapp_to: '', reminder_time: '08:00', reminder_enabled: 'true' })
-  const [saved, setSaved] = useState(false)
-  const [testing, setTesting] = useState(false)
-  const [testResult, setTestResult] = useState(null)
+export default function Settings({ tasks = [], onTasksImported }) {
+  const { user, updateUser } = useAuth();
+  const [settings, setSettings] = useState({
+    reminder_time: '08:00',
+    reminder_enabled: true,
+    email_reminders: false,
+    whatsapp_to: '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState('');
 
-  useEffect(() => { getSettings().then(s => setForm(f => ({ ...f, ...s }))) }, [])
+  useEffect(() => {
+    api.get('/settings').then(s => {
+      setSettings({
+        reminder_time: s.reminder_time || '08:00',
+        reminder_enabled: Boolean(s.reminder_enabled),
+        email_reminders: Boolean(s.email_reminders),
+        whatsapp_to: s.whatsapp_to || '',
+      });
+    }).catch(console.error);
+  }, []);
 
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
-
-  async function handleSave(e) {
-    e.preventDefault()
-    await updateSettings(form)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2500)
-  }
-
-  async function handleTest() {
-    setTesting(true); setTestResult(null)
+  const handleSave = async (e) => {
+    e.preventDefault();
+    setSaving(true); setError(''); setSaved(false);
     try {
-      const res = await testWhatsApp()
-      setTestResult({ ok: true, msg: res.message })
+      await api.put('/settings', settings);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
     } catch (err) {
-      setTestResult({ ok: false, msg: err.message })
-    } finally {
-      setTesting(false)
-    }
-  }
+      setError(err.message);
+    } finally { setSaving(false); }
+  };
+
+  const toggle = (key) => setSettings(s => ({ ...s, [key]: !s[key] }));
 
   return (
-    <div className="flex-1 overflow-y-auto pb-6 max-w-xl">
-      <h2 className="text-xl font-bold text-white mb-5">Settings</h2>
+    <div className="max-w-2xl mx-auto p-4 space-y-6">
+      <h2 className="text-xl font-bold text-white">Settings</h2>
 
-      <form onSubmit={handleSave} className="flex flex-col gap-5">
-        {/* WhatsApp */}
-        <div className="card p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <span className="text-xl">💬</span>
-            <h3 className="font-semibold text-white">WhatsApp Reminders</h3>
-          </div>
+      {/* Reminder settings */}
+      <form onSubmit={handleSave} className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-800">
+          <h3 className="text-white font-semibold">Reminders</h3>
+          <p className="text-gray-500 text-sm mt-0.5">Configure how you receive daily task digests</p>
+        </div>
 
-          <div className="flex flex-col gap-4">
-            <div>
-              <label className="label">Your WhatsApp Number</label>
-              <input
-                className="input"
-                placeholder="+972501234567"
-                value={form.whatsapp_to}
-                onChange={e => set('whatsapp_to', e.target.value)}
-              />
-              <p className="text-xs text-gray-600 mt-1">Include country code (e.g. +972 for Israel)</p>
-            </div>
-
-            <div>
-              <label className="label">Daily Reminder Time</label>
-              <input
-                className="input"
-                type="time"
-                value={form.reminder_time}
-                onChange={e => set('reminder_time', e.target.value)}
-              />
-            </div>
-
-            <label className="flex items-center gap-3 cursor-pointer">
-              <div
-                onClick={() => set('reminder_enabled', form.reminder_enabled === 'true' ? 'false' : 'true')}
-                className={`w-10 h-6 rounded-full transition-colors relative ${form.reminder_enabled === 'true' ? 'bg-indigo-600' : 'bg-gray-700'}`}
-              >
-                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${form.reminder_enabled === 'true' ? 'left-5' : 'left-1'}`} />
+        <div className="p-5 space-y-5">
+          {/* WhatsApp */}
+          <div>
+            <label className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">💬</span>
+                <span className="text-gray-300 font-medium text-sm">WhatsApp Reminders</span>
               </div>
-              <span className="text-sm text-gray-300">Enable daily reminders</span>
+              <button type="button" onClick={() => toggle('reminder_enabled')}
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                  settings.reminder_enabled ? 'bg-green-600' : 'bg-gray-700'
+                }`}>
+                <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform ${
+                  settings.reminder_enabled ? 'translate-x-4.5' : 'translate-x-0.5'
+                }`} />
+              </button>
             </label>
+            {settings.reminder_enabled && (
+              <div className="space-y-3 pl-7">
+                <div>
+                  <label className="text-gray-500 text-xs block mb-1">Your WhatsApp number</label>
+                  <input
+                    type="tel"
+                    value={settings.whatsapp_to}
+                    onChange={e => setSettings(s => ({ ...s, whatsapp_to: e.target.value }))}
+                    placeholder="+1234567890"
+                    className="bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-white text-sm w-full focus:outline-none focus:border-green-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-gray-500 text-xs block mb-1">Reminder time</label>
+                  <input
+                    type="time"
+                    value={settings.reminder_time}
+                    onChange={e => setSettings(s => ({ ...s, reminder_time: e.target.value }))}
+                    className="bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-green-500"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
-          <div className="border-t border-gray-800 mt-4 pt-4">
-            <p className="text-xs text-gray-500 mb-3">
-              Powered by <strong className="text-gray-400">Twilio</strong>. Set <code className="bg-gray-800 px-1 rounded text-gray-300">TWILIO_ACCOUNT_SID</code>, <code className="bg-gray-800 px-1 rounded text-gray-300">TWILIO_AUTH_TOKEN</code> in your <code className="bg-gray-800 px-1 rounded text-gray-300">.env</code> file.
-            </p>
-            <button type="button" onClick={handleTest} disabled={testing} className="btn-ghost text-sm border border-gray-700">
-              {testing ? 'Sending...' : '🧪 Send Test Message'}
-            </button>
-            {testResult && (
-              <p className={`text-sm mt-2 ${testResult.ok ? 'text-green-400' : 'text-red-400'}`}>
-                {testResult.ok ? '✓ ' : '✗ '}{testResult.msg}
-              </p>
-            )}
+          {/* Email */}
+          <div className="border-t border-gray-800 pt-5">
+            <label className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">📧</span>
+                <div>
+                  <span className="text-gray-300 font-medium text-sm">Email Digest</span>
+                  <p className="text-gray-600 text-xs">Daily summary sent at 08:00 to {user?.email}</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => toggle('email_reminders')}
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                  settings.email_reminders ? 'bg-indigo-600' : 'bg-gray-700'
+                }`}>
+                <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform ${
+                  settings.email_reminders ? 'translate-x-4.5' : 'translate-x-0.5'
+                }`} />
+              </button>
+            </label>
           </div>
         </div>
 
-        <button type="submit" className="btn-primary">
-          {saved ? '✓ Saved!' : 'Save Settings'}
-        </button>
+        {error && <div className="mx-5 mb-4 bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-red-400 text-sm">{error}</div>}
+        {saved && <div className="mx-5 mb-4 bg-green-500/10 border border-green-500/30 rounded-lg p-3 text-green-400 text-sm">✓ Settings saved</div>}
+
+        <div className="px-5 pb-5">
+          <button type="submit" disabled={saving}
+            className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium px-6 py-2.5 rounded-xl transition-colors">
+            {saving ? 'Saving...' : 'Save Settings'}
+          </button>
+        </div>
       </form>
 
-      {/* Setup guide */}
-      <div className="card p-5 mt-5">
-        <h3 className="font-semibold text-white mb-3">🚀 WhatsApp Setup Guide</h3>
-        <ol className="text-sm text-gray-400 flex flex-col gap-2 list-decimal list-inside">
-          <li>Create a free account at <strong className="text-gray-300">twilio.com</strong></li>
-          <li>Enable the <strong className="text-gray-300">WhatsApp Sandbox</strong> in Twilio console</li>
-          <li>Send <code className="bg-gray-800 px-1 rounded text-gray-300">join &lt;your-sandbox-code&gt;</code> from your WhatsApp to <strong className="text-gray-300">+1 415 523 8886</strong></li>
-          <li>Copy your Account SID &amp; Auth Token to <code className="bg-gray-800 px-1 rounded text-gray-300">server/.env</code></li>
-          <li>Enter your phone number above and save</li>
-        </ol>
-      </div>
+      {/* Calendar sync */}
+      <CalendarSync tasks={tasks} onTasksImported={onTasksImported} />
     </div>
-  )
+  );
 }
