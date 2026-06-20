@@ -7,7 +7,10 @@ const STATUS_LABELS = { pending: 'Pending', in_progress: 'In Progress', done: 'D
 export default function TaskCard({ task, onRefresh, onEdit }) {
   const [loading, setLoading] = useState(false)
 
-  const isOverdue = task.due_date && task.status !== 'done' && new Date(task.due_date) < new Date(new Date().toDateString())
+  // Fix: append T00:00:00 so the date is parsed as LOCAL midnight, not UTC midnight
+  // Otherwise tasks in UTC+ timezones show incorrect overdue status
+  const isOverdue = task.due_date && task.status !== 'done' &&
+    new Date(task.due_date + 'T00:00:00') < new Date(new Date().toDateString())
 
   async function cycleStatus() {
     const next = { pending: 'in_progress', in_progress: 'done', done: 'pending' }
