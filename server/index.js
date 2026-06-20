@@ -2,34 +2,50 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const session = require('express-session');
+const passport = require('passport');
+
+const tasksRouter = require('./routes/tasks');
+const categoriesRouter = require('./routes/categories');
+const settingsRouter = require('./routes/settings');
+const authRouter = require('./routes/auth');
+const adminRouter = require('./routes/admin');
+const calendarRouter = require('./routes/calendar');
 const { startScheduler } = require('./services/scheduler');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-const allowedOrigins = [
-  'http://localhost',
-  'http://localhost:80',
-  'http://localhost:5173',
-  ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : []),
-];
+// ── Middleware ────────────────────────────────────────────────────────────────
 app.use(cors({
-  origin: (origin, cb) => cb(null, !origin || allowedOrigins.includes(origin)),
+  origin: process.env.CLIENT_URL || 'http://localhost',
   credentials: true,
 }));
 app.use(express.json());
 
-// Routes
-app.use('/api/tasks', require('./routes/tasks'));
-app.use('/api/categories', require('./routes/categories'));
-app.use('/api/settings', require('./routes/settings'));
+// Short-lived session only for OAuth redirect flow
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'dev-session-secret',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { secure: false, maxAge: 10 * 60 * 1000 }, // 10 min
+}));
+app.use(passport.initialize());
+app.use(passport.session());
+
+// ── Routes ────────────────────────────────────────────────────────────────────
+app.use('/api/auth', authRouter);
+app.use('/api/admin', adminRouter);
+app.use('/api/calendar', calendarRouter);
+app.use('/api/tasks', tasksRouter);
+app.use('/api/categories', categoriesRouter);
+app.use('/api/settings', settingsRouter);
 
 // Health check
 app.get('/api/health', (req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));
 
-// Start cron scheduler
-startScheduler();
-
+// ── Start ─────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`[Server] Running on port ${PORT}`);
+  startScheduler();
 });
