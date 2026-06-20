@@ -7,12 +7,25 @@ services:
       - "3001:3001"
     environment:
       - PORT=3001
+      - NODE_ENV=production
+      - CLIENT_URL=http://localhost
+      # JWT & Sessions (change these!)
+      - JWT_SECRET=${JWT_SECRET:-dev-jwt-secret-change-in-prod}
+      - SESSION_SECRET=${SESSION_SECRET:-dev-session-secret-change-in-prod}
+      # Google OAuth — set these in a .env file at project root
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      # Admin override (optional)
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-}
+      # Twilio WhatsApp (optional)
       - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID:-}
       - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN:-}
-      - TWILIO_WHATSAPP_FROM=${TWILIO_WHATSAPP_FROM:-whatsapp:+14155238886}
-      - WHATSAPP_TO=${WHATSAPP_TO:-}
-      - REMINDER_TIME=${REMINDER_TIME:-08:00}
-      - REMINDER_TIMEZONE=${REMINDER_TIMEZONE:-Asia/Jerusalem}
+      - TWILIO_WHATSAPP_FROM=${TWILIO_WHATSAPP_FROM:-+14155238886}
+      # Email reminders (optional)
+      - SMTP_HOST=${SMTP_HOST:-smtp.gmail.com}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
     volumes:
       - db_data:/app/data
     healthcheck:
