@@ -1,87 +1,102 @@
-import { useEffect, useState } from 'react'
-import { getStats } from '../api'
+import { useState, useEffect } from 'react';
+import { api } from '../api';
 
-function StatCard({ label, value, icon, color = 'text-white', sub }) {
+function MiniBar({ label, count, total, color }) {
+  const pct = total > 0 ? Math.round((count / total) * 100) : 0;
   return (
-    <div className="card p-5">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-gray-500 text-sm">{label}</p>
-          <p className={`text-3xl font-bold mt-1 ${color}`}>{value}</p>
-          {sub && <p className="text-xs text-gray-600 mt-1">{sub}</p>}
-        </div>
-        <span className="text-2xl">{icon}</span>
+    <div>
+      <div className="flex justify-between text-xs mb-1">
+        <span className="text-gray-400 capitalize">{label}</span>
+        <span className="text-gray-500">{count} ({pct}%)</span>
+      </div>
+      <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
       </div>
     </div>
-  )
+  );
 }
 
 export default function Stats() {
-  const [stats, setStats] = useState(null)
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getStats().then(setStats)
-  }, [])
+    api.get('/tasks/stats/summary')
+      .then(setStats)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
 
-  if (!stats) return <div className="flex items-center justify-center h-64 text-gray-600">Loading stats...</div>
+  if (loading) return (
+    <div className="grid grid-cols-2 gap-3 p-4 animate-pulse">
+      {[...Array(4)].map((_, i) => (
+        <div key={i} className="h-24 bg-gray-800 rounded-xl" />
+      ))}
+    </div>
+  );
 
-  // Build 7-day trend
-  const days = []
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date()
-    d.setDate(d.getDate() - i)
-    const key = d.toISOString().split('T')[0]
-    const match = stats.trend.find(t => t.day === key)
-    days.push({ label: d.toLocaleDateString('en-US', { weekday: 'short' }), count: match?.completed || 0 })
-  }
-  const maxCount = Math.max(...days.map(d => d.count), 1)
+  if (!stats) return null;
+
+  const completionRate = stats.total > 0 ? Math.round((stats.done / stats.total) * 100) : 0;
+  const pending = stats.total - stats.done;
+
+  const priorityMap = {};
+  (stats.byPriority || []).forEach(p => { priorityMap[p.priority] = p.count; });
+
+  const statusMap = {};
+  (stats.byStatus || []).forEach(s => { statusMap[s.status] = s.count; });
 
   return (
-    <div className="flex-1 overflow-y-auto pb-6">
-      <h2 className="text-xl font-bold text-white mb-5">Progress Overview</h2>
+    <div className="p-4 space-y-4">
+      {/* Top metric cards */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+          <div className="text-2xl font-bold text-white">{stats.total}</div>
+          <div className="text-xs text-gray-500 mt-0.5">Total Tasks</div>
+          <div className="mt-2 h-1 bg-gray-800 rounded-full overflow-hidden">
+            <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${completionRate}%` }} />
+          </div>
+          <div className="text-xs text-indigo-400 mt-1">{completionRate}% done</div>
+        </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
-        <StatCard label="Total Tasks" value={stats.total} icon="📋" />
-        <StatCard label="Completed" value={stats.done} icon="✅" color="text-green-400" sub={`${stats.completionRate}% completion rate`} />
-        <StatCard label="In Progress" value={stats.inProgress} icon="🔄" color="text-yellow-400" />
-        <StatCard label="Pending" value={stats.pending} icon="⏳" color="text-gray-300" />
-        <StatCard label="Due Today" value={stats.dueToday} icon="📅" color="text-indigo-400" />
-        <StatCard label="Overdue" value={stats.overdue} icon="⚠️" color={stats.overdue > 0 ? 'text-red-400' : 'text-gray-400'} />
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+          <div className="text-2xl font-bold text-green-400">{stats.done}</div>
+          <div className="text-xs text-gray-500 mt-0.5">Completed</div>
+          <div className="text-xs text-gray-600 mt-2">{pending} remaining</div>
+        </div>
+
+        <div className="bg-red-950/40 border border-red-900/50 rounded-xl p-4">
+          <div className="text-2xl font-bold text-red-400">{stats.overdue}</div>
+          <div className="text-xs text-gray-500 mt-0.5">Overdue</div>
+          {stats.overdue > 0 && <div className="text-xs text-red-500 mt-2">Needs attention</div>}
+        </div>
+
+        <div className="bg-indigo-950/40 border border-indigo-900/50 rounded-xl p-4">
+          <div className="text-2xl font-bold text-indigo-400">{stats.dueToday}</div>
+          <div className="text-xs text-gray-500 mt-0.5">Due Today</div>
+          {stats.dueToday > 0 && <div className="text-xs text-indigo-400 mt-2">Focus here</div>}
+        </div>
       </div>
 
-      {/* Completion Rate Bar */}
-      <div className="card p-5 mb-4">
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-sm font-medium text-gray-300">Overall Completion</p>
-          <p className="text-sm font-bold text-indigo-400">{stats.completionRate}%</p>
+      {/* Priority breakdown */}
+      {stats.total > 0 && (
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 space-y-3">
+          <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">By Priority</p>
+          <MiniBar label="High" count={priorityMap.high || 0} total={stats.total} color="bg-red-400" />
+          <MiniBar label="Medium" count={priorityMap.medium || 0} total={stats.total} color="bg-indigo-400" />
+          <MiniBar label="Low" count={priorityMap.low || 0} total={stats.total} color="bg-green-400" />
         </div>
-        <div className="h-3 bg-gray-800 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-gradient-to-r from-indigo-600 to-indigo-400 rounded-full transition-all duration-700"
-            style={{ width: `${stats.completionRate}%` }}
-          />
-        </div>
-      </div>
+      )}
 
-      {/* 7-day trend */}
-      <div className="card p-5">
-        <p className="text-sm font-medium text-gray-300 mb-4">Completed Tasks — Last 7 Days</p>
-        <div className="flex items-end gap-2 h-24">
-          {days.map((d, i) => (
-            <div key={i} className="flex-1 flex flex-col items-center gap-1">
-              <span className="text-xs text-gray-500">{d.count || ''}</span>
-              <div
-                className="w-full rounded-t-md bg-indigo-600/60 transition-all duration-500"
-                style={{ height: `${(d.count / maxCount) * 80}px`, minHeight: d.count ? '4px' : '0' }}
-              />
-              <span className="text-xs text-gray-500">{d.label}</span>
-            </div>
-          ))}
+      {/* Status breakdown */}
+      {stats.total > 0 && (
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 space-y-3">
+          <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">By Status</p>
+          <MiniBar label="Todo" count={statusMap.todo || 0} total={stats.total} color="bg-gray-400" />
+          <MiniBar label="In Progress" count={statusMap.in_progress || 0} total={stats.total} color="bg-blue-400" />
+          <MiniBar label="Done" count={statusMap.done || 0} total={stats.total} color="bg-green-400" />
         </div>
-        {days.every(d => d.count === 0) && (
-          <p className="text-center text-gray-600 text-sm mt-2">Complete some tasks to see your trend 🚀</p>
-        )}
-      </div>
+      )}
     </div>
-  )
+  );
 }
