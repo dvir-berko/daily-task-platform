@@ -7,7 +7,16 @@ const { startScheduler } = require('./services/scheduler');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors({ origin: 'http://localhost:5173' }));
+const allowedOrigins = [
+  'http://localhost',
+  'http://localhost:80',
+  'http://localhost:5173',
+  ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : []),
+];
+app.use(cors({
+  origin: (origin, cb) => cb(null, !origin || allowedOrigins.includes(origin)),
+  credentials: true,
+}));
 app.use(express.json());
 
 // Routes
