@@ -1,0 +1,15 @@
+# Copy this file to terraform.tfvars and fill in your values
+# terraform.tfvars is gitignored — never commit secrets!
+
+aws_region  = "us-east-1"
+environment = "prod"
+app_name    = "daily-task-platform"
+
+# Twilio credentials (from https://console.twilio.com)
+twilio_account_sid   = "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+twilio_auth_token    = "your_auth_token_here"
+twilio_whatsapp_from = "whatsapp:+14155238886"
+whatsapp_to          = "whatsapp:+972XXXXXXXXX"
+
+reminder_time     = "08:00"
+reminder_timezone = "Asia/Jerusalem"
