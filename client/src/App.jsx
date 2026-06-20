@@ -23,7 +23,12 @@ export default function App() {
   function openNewTask() { setModal({}); setView('tasks') }
   function openEditTask(task) { setModal({ task }) }
   function closeModal() { setModal(null) }
-  function onTaskSaved() { setModal(null); setTaskListKey(k => k + 1); loadCategories() }
+  function onTaskSaved() {
+    setModal(null)
+    setTaskListKey(k => k + 1)
+    loadCategories()
+    setSelectedFilter(null) // reset to All Tasks so the saved task is always visible
+  }
 
   return (
     <div className="min-h-screen flex flex-col">
