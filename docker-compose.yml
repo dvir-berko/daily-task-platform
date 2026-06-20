@@ -7,8 +7,19 @@ services:
       - "3001:3001"
     environment:
       - PORT=3001
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID:-}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN:-}
+      - TWILIO_WHATSAPP_FROM=${TWILIO_WHATSAPP_FROM:-whatsapp:+14155238886}
+      - WHATSAPP_TO=${WHATSAPP_TO:-}
+      - REMINDER_TIME=${REMINDER_TIME:-08:00}
+      - REMINDER_TIMEZONE=${REMINDER_TIMEZONE:-Asia/Jerusalem}
     volumes:
-      - db_data:/app
+      - db_data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
     restart: unless-stopped
 
   client:
@@ -16,7 +27,8 @@ services:
     ports:
       - "80:80"
     depends_on:
-      - server
+      server:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:
