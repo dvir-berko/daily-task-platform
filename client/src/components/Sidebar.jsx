@@ -38,7 +38,8 @@ export default function Sidebar({ categories, selectedCategory, onSelect, onRefr
     if (!confirm('Delete this category? Tasks will be unassigned.')) return
     await deleteCategory(id)
     onRefresh()
-    if (selectedCategory === id) onSelect(null)
+    // fix: selectedCategory uses "cat_" prefix, must match the same format
+    if (selectedCategory === `cat_${id}`) onSelect(null)
   }
 
   return (
