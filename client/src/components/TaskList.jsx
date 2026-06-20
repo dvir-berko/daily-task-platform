@@ -5,10 +5,12 @@ import TaskCard from './TaskCard'
 export default function TaskList({ filter, categories, onEditTask }) {
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [search, setSearch] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
+    setError(null)
     try {
       const params = {}
       if (filter === 'today') params.date = new Date().toISOString().split('T')[0]
@@ -19,6 +21,8 @@ export default function TaskList({ filter, categories, onEditTask }) {
 
       const data = await getTasks(params)
       setTasks(data)
+    } catch (err) {
+      setError(err.message)
     } finally {
       setLoading(false)
     }
@@ -51,6 +55,13 @@ export default function TaskList({ filter, categories, onEditTask }) {
 
       {loading ? (
         <div className="flex-1 flex items-center justify-center text-gray-600">Loading...</div>
+      ) : error ? (
+        <div className="flex-1 flex flex-col items-center justify-center text-center py-20">
+          <div className="text-4xl mb-3">⚠️</div>
+          <p className="text-red-400 font-medium">Failed to load tasks</p>
+          <p className="text-gray-600 text-sm mt-1">{error}</p>
+          <button onClick={load} className="btn-ghost mt-4 text-sm border border-gray-700">Retry</button>
+        </div>
       ) : visible.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center text-center py-20">
           <div className="text-5xl mb-4">🎯</div>
